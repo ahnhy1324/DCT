@@ -13,6 +13,16 @@ pi = 3.141592653589793238
 c = np.zeros(40, dtype=float)
 s = np.zeros(40, dtype=float)
 
+Quant_table = np.array([[16,11,10,16,24,40,51,61],
+                         [12,12,14,19,26,58,60,66],
+                         [14,13,16,24,40,57,69,57],
+                         [14,17,22,29,51,87,80,62],
+                         [18,22,37,56,68,109,103,77],
+                         [24,36,55,64,81,104,113,92],
+                         [49,64,78,87,103,121,120,101],
+                         [72,92,95,98,112,100,103,99]])
+
+
 for i in range(40):  # 싸인 코사인 테이블
     zz = pi * (i + 1) / 64.0
     c[i] = math.cos(zz)
@@ -28,7 +38,7 @@ def image_read(file):
 
 def image_write(name, image):
     with open(name, "wb") as f:
-        f.write(bytes(np.flipud(image)))
+        f.write(bytes(np.flipud(image[::-1])))
 
 
 def nint(x):
@@ -242,20 +252,44 @@ def _8X8_DCT(data):
     return outdata
 
 
-test = np.array(0)
+def mse(ori, data):
+    print(np.square(np.subtract(ori, data)).mean())
+    return
+
+
+def quant(data):
+    out_data = np.zeros_like(data, dtype=np.int32)
+    out_data = data/Quant_table
+    return out_data
+
+
+def inv_quant(data):
+    out_data = np.zeros_like(data, dtype=np.int32)
+    out_data = data*Quant_table
+    return out_data
+
+
 for i in file_name:
     image_data = image_read(i).reshape(512, 512)
-    dct_image = np.zeros_like(image_data, dtype=np.int32) # 파일 입력
-    print(dct_image)
+    dct_image = np.zeros_like(image_data, dtype=np.int32)
+    quant_out = np.zeros_like(image_data, dtype=np.int32)
+    for j in range(int(image_height // B_size)):
+        for k in range(int(image_height // B_size)):
+            dct_image[k * B_size:(k+1) * B_size, j * B_size:(j+1) * B_size] = \
+                _8X8_DCT(image_data[k * B_size:k * B_size + 8, j * B_size:j * B_size + 8])
+    dct_out = (dct_image - dct_image.min()) / (dct_image.max() - dct_image.min()) * 255
+    plt.imshow(dct_out.astype('uint8'), cmap='gray')
+    plt.show()
 
+    #역DCT
     for j in range(int(image_height // B_size)):
         for k in range(int(image_height // B_size)):
-            dct_image[k * B_size:(k+1) * B_size, j * B_size:(j+1) * B_size] = _8X8_DCT(image_data[k * B_size:k * B_size + 8, j * B_size:j * B_size + 8])
+            dct_image[k * B_size:(k+1) * B_size, j * B_size:(j+1) * B_size] = \
+                _8x8_inv_DCT(dct_image[k * B_size:k * B_size + 8, j * B_size:j * B_size + 8])
     plt.imshow(dct_image, cmap='gray')
+    print("MSE of " + i)
+    mse(image_data, dct_image)
     plt.show()
-    for j in range(int(image_height // B_size)):
-        for k in range(int(image_height // B_size)):
-            dct_image[k * B_size:(k+1) * B_size, j * B_size:(j+1) * B_size] = _8x8_inv_DCT(dct_image[k * B_size:k * B_size + 8, j * B_size:j * B_size + 8])
-    plt.imshow(dct_image, cmap='gray')
-    plt.show()
-pass
+    image_write("DCT_"+i, dct_image.astype('uint8'))
+
+
